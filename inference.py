@@ -18,19 +18,25 @@ def greedy_decode(model, src, src_mask, max_len, start_symbol):
 
 def beam_search(model, src, src_mask, max_len, start_symbol, beam_size=5):
     memory = model.encode(src, src_mask)
-    # beam = [(sequence_tensor, score)]
     start_seq = torch.ones(1, 1).fill_(start_symbol).type_as(src.data)
+    # beam = [(sequence, log_prob_sum)]
     beam = [(start_seq, 0.0)]
     
+    # Paper uses alpha = 0.6 for length penalty
+    alpha = 0.6
+
     for i in range(max_len-1):
         candidates = []
-        for seq, score in beam:
+        for seq, log_prob_sum in beam:
+            if seq[0, -1] == 2: # Stop if EOS (assuming 2 is EOS, adjust if different)
+                 candidates.append((seq, log_prob_sum))
+                 continue
+                 
             # Expand
             out = model.decode(memory, src_mask, 
                                seq, 
                                subsequent_mask(seq.size(1)).type_as(src.data))
             prob = model.generator(out[:, -1])
-            # prob is log_softmax
             
             # Get top k for this beam
             topk_probs, topk_indices = torch.topk(prob, beam_size, dim=1)
@@ -40,14 +46,23 @@ def beam_search(model, src, src_mask, max_len, start_symbol, beam_size=5):
                 prob_score = topk_probs[0, k].item()
                 
                 new_seq = torch.cat([seq, torch.ones(1, 1).type_as(src.data).fill_(next_word)], dim=1)
-                new_score = score + prob_score
-                candidates.append((new_seq, new_score))
+                new_log_prob_sum = log_prob_sum + prob_score
+                candidates.append((new_seq, new_log_prob_sum))
         
-        # Sort all candidates and prune to beam_size
-        candidates.sort(key=lambda x: x[1], reverse=True)
+        # Sort by LENGTH PENALIZED score: score / ((5 + len) / 6) ^ alpha
+        def get_score(candidate):
+            seq, lp_sum = candidate
+            length = seq.size(1)
+            penalty = ((5 + length) / 6) ** alpha
+            return lp_sum / penalty
+
+        candidates.sort(key=get_score, reverse=True)
         beam = candidates[:beam_size]
         
-    # Return the best sequence
+        # Break if all beams ended (optional optimization)
+        if all(c[0][0, -1] == 2 for c in beam):
+            break
+            
     return beam[0][0]
 
 def load_model(path="model_final.pt", V=11):

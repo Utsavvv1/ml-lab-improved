@@ -10,17 +10,25 @@ from data import subsequent_mask
 
 def load_model(path, V):
     print(f"Loading model from {path}...")
-    model = make_model(V, V, N=6) # Ensure N matches training (default 6 here, but training typically uses 6 or 2 based on copy task vs real)
-    # The user might have trained with N=6 in train_real_world, so we stick to 6.
-    # ideally we should load config. For now assuming N=6.
     
+    # Try default N=6 (Real World)
     try:
+        model = make_model(V, V, N=6)
         model.load_state_dict(torch.load(path))
-    except Exception as e:
-        print(f"Error loading model: {e}")
-        print("Trying N=2 (Copy Task default) just in case...")
-        model = make_model(V, V, N=2)
-        model.load_state_dict(torch.load(path))
+        print("Loaded model with N=6 (Real World default).")
+    except Exception:
+        # Try N=2 (Copy Task default)
+        try:
+             print("Loading failed. Trying N=2 (Copy Task default)...")
+             model = make_model(V, V, N=2)
+             model.load_state_dict(torch.load(path))
+             print("Loaded model with N=2.")
+        except Exception:
+             # Try Dummy Model Config (N=2, d_model=128, etc)
+             print("Loading failed. Trying Dummy Model Config (N=2, d_model=128)...")
+             model = make_model(V, V, N=2, d_model=128, d_ff=512, h=4)
+             model.load_state_dict(torch.load(path))
+             print("Loaded Dummy Model.")
         
     model.eval()
     if torch.cuda.is_available():
