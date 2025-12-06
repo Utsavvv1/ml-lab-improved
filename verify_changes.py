@@ -53,6 +53,24 @@ def test_beam_search():
         print(f"FAIL: Beam Search error: {e}")
         raise e
 
+def test_flash_attention():
+    print("Testing Flash Attention...")
+    import torch.nn.functional as F
+    if hasattr(F, 'scaled_dot_product_attention'):
+        print("PASS: PyTorch version supports SDPA (FlashAttention).")
+        # Could verify it runs
+        q = torch.randn(1, 8, 32, 64)
+        k = torch.randn(1, 8, 32, 64)
+        v = torch.randn(1, 8, 32, 64)
+        from models.blocks import attention
+        # Mock dropout
+        drop = torch.nn.Dropout(0.1)
+        out, _ = attention(q, k, v, mask=None, dropout=drop)
+        assert out.shape == q.shape
+        print("PASS: Optimized attention ran successfully.")
+    else:
+        print("WARNING: PyTorch too old for SDPA.")
+
 def test_data_pipeline():
     print("Testing Data Pipeline...")
     # Create dummy files
@@ -85,5 +103,6 @@ if __name__ == "__main__":
     test_weight_sharing()
     test_post_ln()
     test_beam_search()
+    test_flash_attention()
     test_data_pipeline()
     print("ALL TESTS PASSED.")
