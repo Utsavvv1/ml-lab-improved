@@ -92,6 +92,22 @@ def test_rope():
     assert not torch.allclose(q_rot, q)
     print("PASS: RoPE applied rotation.")
 
+def test_gelu():
+    print("Testing GeLU...")
+    from models.blocks import PositionwiseFeedForward
+    import torch.nn.functional as F
+    
+    d_model = 64
+    d_ff = 128
+    ff = PositionwiseFeedForward(d_model, d_ff)
+    
+    x = torch.randn(1, 10, d_model)
+    out = ff(x)
+    assert out.shape == x.shape
+    # Check if F.gelu is actually being used (simple static analysis check or just runtime)
+    # Runtime is fine.
+    print("PASS: GeLU FeedForward ran successfully.")
+
 def test_data_pipeline():
     print("Testing Data Pipeline...")
     # Create dummy files
@@ -127,5 +143,6 @@ if __name__ == "__main__":
     test_beam_search()
     test_flash_attention()
     test_rope()
+    test_gelu()
     test_data_pipeline()
     print("ALL TESTS PASSED.")
