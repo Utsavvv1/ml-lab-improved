@@ -75,5 +75,61 @@ def train_copy_task():
     pred = greedy_decode(model, src, src_mask, max_len=10, start_symbol=1)
     print("Predicted:", pred)
 
+def train_real_world(src_file, trg_file, tokenizer_path="tokenizer.json", vocab_size=5000, epoch_count=10):
+    print(f"Starting Real World Training with {src_file} -> {trg_file}")
+    
+    # 1. Train or Load Tokenizer
+    from utils.tokenizer import BPETokenizer
+    tokenizer = BPETokenizer(vocab_size)
+    import os
+    if os.path.exists(tokenizer_path):
+        print(f"Loading tokenizer from {tokenizer_path}")
+        tokenizer.load(tokenizer_path)
+    else:
+        print("Training Tokenizer...")
+        tokenizer.train([src_file, trg_file])
+        tokenizer.save(tokenizer_path)
+        
+    V = tokenizer.get_vocab_size()
+    print(f"Vocabulary Size: {V}")
+    
+    # 2. Model
+    # Note: You might want to tune d_model etc for real tasks
+    model = make_model(V, V, N=6) 
+    
+    # 3. Optimizer
+    model_opt = NoamOpt(model.src_embed[0].d_model, 1, 400,
+            torch.optim.Adam(model.parameters(), lr=0, betas=(0.9, 0.98), eps=1e-9))
+            
+    # 4. Criterion
+    pad_idx = tokenizer.pad_token_id
+    criterion = LabelSmoothing(size=V, padding_idx=pad_idx, smoothing=0.1)
+    
+    if torch.cuda.is_available():
+        model.cuda()
+        device = "cuda"
+    else:
+        device = "cpu"
+    
+    # 5. Loop
+    from data.loader import TextDataLoader
+    for epoch in range(epoch_count):
+        print(f"Epoch {epoch}")
+        model.train()
+        loader = TextDataLoader(src_file, trg_file, tokenizer, batch_size=32, device=device)
+        run_epoch(loader, model, SimpleLossCompute(model.generator, criterion, model_opt), epoch)
+        model.eval()
+        # Validation could go here
+        
+    torch.save(model.state_dict(), "model_real.pt")
+    print("Model saved to model_real.pt")
+
 if __name__ == "__main__":
-    train_copy_task()
+    import sys
+    import os
+    if len(sys.argv) > 2 and os.path.exists(sys.argv[1]):
+        # Usage: python train.py data/train.de data/train.en
+        train_real_world(sys.argv[1], sys.argv[2])
+    else:
+        print("No real data files provided or found. Running Synthetic Copy Task...")
+        train_copy_task()

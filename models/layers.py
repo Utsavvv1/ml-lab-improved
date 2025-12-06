@@ -5,11 +5,11 @@ from .blocks import SublayerConnection, clones
 
 class EncoderLayer(nn.Module):
     "Encoder is made up of self-attn and feed forward (defined below)"
-    def __init__(self, size, self_attn, feed_forward, dropout):
+    def __init__(self, size, self_attn, feed_forward, dropout, layer_norm_mode="pre_ln"):
         super(EncoderLayer, self).__init__()
         self.self_attn = self_attn
         self.feed_forward = feed_forward
-        self.sublayer = clones(SublayerConnection(size, dropout), 2)
+        self.sublayer = clones(SublayerConnection(size, dropout, layer_norm_mode), 2)
         self.size = size
 
     def forward(self, x, mask):
@@ -18,13 +18,13 @@ class EncoderLayer(nn.Module):
 
 class DecoderLayer(nn.Module):
     "Decoder is made of self-attn, src-attn, and feed forward (defined below)"
-    def __init__(self, size, self_attn, src_attn, feed_forward, dropout):
+    def __init__(self, size, self_attn, src_attn, feed_forward, dropout, layer_norm_mode="pre_ln"):
         super(DecoderLayer, self).__init__()
         self.size = size
         self.self_attn = self_attn
         self.src_attn = src_attn
         self.feed_forward = feed_forward
-        self.sublayer = clones(SublayerConnection(size, dropout), 3)
+        self.sublayer = clones(SublayerConnection(size, dropout, layer_norm_mode), 3)
 
     def forward(self, x, memory, src_mask, tgt_mask):
         m = memory

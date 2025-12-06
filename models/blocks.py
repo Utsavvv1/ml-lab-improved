@@ -26,14 +26,18 @@ class SublayerConnection(nn.Module):
     A residual connection followed by a layer norm.
     Note for code simplicity the norm is first as opposed to last.
     """
-    def __init__(self, size, dropout):
+    def __init__(self, size, dropout, mode="pre_ln"):
         super(SublayerConnection, self).__init__()
         self.norm = LayerNorm(size)
         self.dropout = nn.Dropout(dropout)
+        self.mode = mode
 
     def forward(self, x, sublayer):
         "Apply residual connection to any sublayer with the same size."
-        return x + self.dropout(sublayer(self.norm(x)))
+        if self.mode == "pre_ln":
+            return x + self.dropout(sublayer(self.norm(x)))
+        elif self.mode == "post_ln":
+            return self.norm(x + self.dropout(sublayer(x)))
 
 def attention(query, key, value, mask=None, dropout=None):
     "Compute 'Scaled Dot Product Attention'"

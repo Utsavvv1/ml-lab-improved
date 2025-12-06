@@ -62,15 +62,15 @@ class Transformer(nn.Module):
     def decode(self, memory, src_mask, tgt, tgt_mask):
         return self.decoder(self.tgt_embed(tgt), memory, src_mask, tgt_mask)
 
-def make_model(src_vocab, tgt_vocab, N=6, d_model=512, d_ff=2048, h=8, dropout=0.1):
+def make_model(src_vocab, tgt_vocab, N=6, d_model=512, d_ff=2048, h=8, dropout=0.1, layer_norm_mode="pre_ln"):
     "Helper: Construct a model from hyperparameters."
     c = copy.deepcopy
     attn = MultiHeadedAttention(h, d_model)
     ff = PositionwiseFeedForward(d_model, d_ff, dropout)
     position = PositionalEncoding(d_model, dropout)
     model = Transformer(
-        Encoder(EncoderLayer(d_model, c(attn), c(ff), dropout), N),
-        Decoder(DecoderLayer(d_model, c(attn), c(attn), c(ff), dropout), N),
+        Encoder(EncoderLayer(d_model, c(attn), c(ff), dropout, layer_norm_mode), N),
+        Decoder(DecoderLayer(d_model, c(attn), c(attn), c(ff), dropout, layer_norm_mode), N),
         nn.Sequential(Embeddings(d_model, src_vocab), c(position)),
         nn.Sequential(Embeddings(d_model, tgt_vocab), c(position)),
         Generator(d_model, tgt_vocab)
@@ -81,4 +81,11 @@ def make_model(src_vocab, tgt_vocab, N=6, d_model=512, d_ff=2048, h=8, dropout=0
     for p in model.parameters():
         if p.dim() > 1:
             nn.init.xavier_uniform_(p)
+            
+    # Weight Sharing
+    # 1. Share src and tgt embeddings (assuming shared vocab or at least intended sharing)
+    model.src_embed[0].lut.weight = model.tgt_embed[0].lut.weight
+    # 2. Share tgt embeddings and generator weights
+    model.generator.proj.weight = model.tgt_embed[0].lut.weight
+    
     return model
