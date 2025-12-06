@@ -1,17 +1,6 @@
-numpy==1.24.3
-pandas==1.5.3
-scikit-learn==1.2.2
-matplotlib==3.7.1
-seaborn==0.12.2
-scipy==1.10.1
-
-# Jupyter
-jupyter==1.0.0
-notebook==6.5.4
-
-# Add any project-specific packages below with pinned versions
-# tensorflow==2.13.0
-# torch==2.2.0numpy
+torch
+numpy
+tqdm
 pandas
 scikit-learn
 matplotlib
@@ -19,7 +8,3 @@ seaborn
 scipy
 jupyter
 notebook
-
-# Add project-specific dependencies below, for example:
-# tensorflow
-# torch
