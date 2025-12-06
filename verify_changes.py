@@ -71,6 +71,27 @@ def test_flash_attention():
     else:
         print("WARNING: PyTorch too old for SDPA.")
 
+def test_rope():
+    print("Testing RoPE...")
+    from models.blocks import RotaryEmbedding, apply_rotary_pos_emb
+    
+    dim = 64
+    rope = RotaryEmbedding(dim)
+    
+    # Create query [Batch, Head, Seq, Dim]
+    q = torch.randn(1, 1, 10, dim)
+    k = torch.randn(1, 1, 10, dim)
+    
+    cos, sin = rope(q, seq_len=10)
+    assert cos.shape == (1, 1, 10, dim)
+    
+    q_rot, k_rot = apply_rotary_pos_emb(q, k, cos, sin)
+    
+    assert q_rot.shape == q.shape
+    # Check that it actually changed
+    assert not torch.allclose(q_rot, q)
+    print("PASS: RoPE applied rotation.")
+
 def test_data_pipeline():
     print("Testing Data Pipeline...")
     # Create dummy files
@@ -103,6 +124,8 @@ if __name__ == "__main__":
     test_weight_sharing()
     test_post_ln()
     test_beam_search()
+    test_beam_search()
     test_flash_attention()
+    test_rope()
     test_data_pipeline()
     print("ALL TESTS PASSED.")
