@@ -1,43 +1,48 @@
-# ml-lab-improved
+# Transformer Implementation (Attention Is All You Need)
 
-## Setup: Open project in VS Code and create Python environment
+This repository contains a PyTorch implementation of the Transformer model from the paper "Attention Is All You Need" by Ashish Vaswani et al.
 
-**Step 3: Open the Project in VS Code**
+## Structure
 
-- **Open VS Code:** Launch Visual Studio Code.
-- **Open Folder:** Go to `File > Open Folder...` (or press `Ctrl+K` `Ctrl+O` on Windows).
-- **Select project folder:** Navigate to and select the `ml-lab-improved` folder created when you cloned the repo.
+The project is organized into the following modules:
 
-**Step 4: Set up the Python Environment**
+- `models/`: Contains the core model architecture.
+  - `model.py`: The main `Transformer` class and `make_model` helper.
+  - `layers.py`: `EncoderLayer` and `DecoderLayer` definitions.
+  - `blocks.py`: `MultiHeadedAttention`, `PositionwiseFeedForward`, `SublayerConnection`.
+  - `embeddings.py`: `Embeddings` and `PositionalEncoding`.
+- `utils/`: Utility functions for training.
+  - `loss.py`: Loss computation including `LabelSmoothing`.
+  - `optimizer.py`: The `NoamOpt` rate scheduling optimizer described in the paper.
+- `data/`: Data handling.
+  - `batches.py`: `Batch` object and synthetic data generation.
+- `train.py`: Main training script to demonstrate the model on a copy task.
 
-- **Open the integrated terminal:** `Terminal > New Terminal` (or press ``Ctrl+`` `` ).
-- **Create a virtual environment (recommended):**
+## Usage
 
-	- Windows PowerShell (create):
+1. **Install Dependencies**:
+   ```bash
+   pip install -r requirements.txt
+   ```
 
-		```powershell
-		python -m venv .venv
-		```
+2. **Run Training Demo**:
+   ```bash
+   python train.py
+   ```
 
-	- Activate the venv on Windows PowerShell:
+## Implementation Details
 
-		```powershell
-		.\.venv\Scripts\Activate
-		```
+This implementation adheres strictly to the paper's design:
+- **Optimizer**: Uses the specific `Noam` learning rate schedule with warmup.
+- **Regularization**: Implements Label Smoothing `KLDivLoss` instead of standard CrossEntropy.
+- **Architecture**: Faithful reproduction of the Multi-Head Attention and Position-wise Feed-Forward networks.
 
-- **Install dependencies:** If this project includes a `requirements.txt` file, install with:
+## Testing
 
-	```powershell
-	pip install -r requirements.txt
-	```
+Test your trained model using the inference script:
 
-- **Select the interpreter in VS Code:** Click the Python version in the bottom-left and choose the Python executable inside `./.venv` (Windows path: `.\.venv\Scripts\python.exe`).
+```bash
+python inference.py
+```
 
-- **Run notebooks / scripts:** You can start Jupyter notebooks with:
-
-	```powershell
-	pip install notebook
-	jupyter notebook
-	```
-
-> Note: Update `requirements.txt` with the exact libraries your project needs. A minimal example `requirements.txt` is included in this repo to get started.
+This will load the trained `model_final.pt` and run a few test sequences to demonstrate the model's ability to copy the input sequence.
