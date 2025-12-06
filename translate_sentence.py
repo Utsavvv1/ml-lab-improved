@@ -42,7 +42,10 @@ def translate(sentence, model, tokenizer):
     src_mask = torch.ones(1, 1, len(ids)).to(device)
     
     # Decode using Beam Search
-    out_seq = beam_search(model, src, src_mask, max_len=60, start_symbol=tokenizer.sos_token_id, beam_size=3)
+    # Note: If the model is not well-trained (e.g. 1 epoch dummy), it repeats tokens.
+    # Increasing max_len just makes it repeat longer.
+    # We will try a smaller max_len for testing.
+    out_seq = beam_search(model, src, src_mask, max_len=30, start_symbol=tokenizer.sos_token_id, beam_size=3)
     
     # Convert text
     out_ids = out_seq.flatten().tolist()

@@ -107,6 +107,29 @@ Based on our [Implementation Progress Report](https://www.google.com/search?q=ml
   * **[Planned] GeLU Activation**: Replacing `ReLU` with Gaussian Error Linear Units to avoid the "dying ReLU" problem[cite: 46, 48].
   * **[Planned] FlashAttention / Linear Attention**: Optimizing the attention mechanism from $O(n^2)$ to $O(n)$ complexity for longer sequence processing[cite: 24, 26].
 
+### 5\. Colab Runner
+
+To train on Google Colab (Free Tier):
+
+```bash
+# 1. Clone your repository
+!git clone https://github.com/Utsavvv1/ml-lab-improved.git
+%cd ml-lab-improved
+
+# 2. Run the auto-setup & training script
+# This handles everything: installs requirements, downloads data, 
+# trains the model, and evaluates it.
+!python colab_runner.py
+```
+
+Note: If you want to save the trained model to your Google Drive (so you don't lose it), run this in a new cell after training finishes:
+
+```python
+from google.colab import drive
+drive.mount('/content/drive')
+!cp model_real.pt /content/drive/MyDrive/model_real.pt
+```
+
 ## 📜 License
 
 MIT License. See `LICENSE` for details.
