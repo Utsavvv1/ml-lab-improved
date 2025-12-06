@@ -10,3 +10,4 @@ jupyter
 notebook
 tokenizers
 sacrebleu
+requests
