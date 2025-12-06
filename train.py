@@ -149,10 +149,52 @@ def train_real_world(src_file, trg_file, tokenizer_path="tokenizer.json", vocab_
     torch.save(model.state_dict(), "model_real.pt")
     print("Model saved to model_real.pt")
 
+def train_dummy_small(src_file, trg_file, tokenizer_path="tokenizer.json"):
+    print("Starting Dummy Small Training for BLEU check...")
+    
+    # 1. Train Tokenizer
+    from utils.tokenizer import BPETokenizer
+    tokenizer = BPETokenizer(vocab_size=2000) # Small vocab
+    if os.path.exists(tokenizer_path):
+        tokenizer.load(tokenizer_path)
+    else:
+        tokenizer.train([src_file, trg_file])
+        tokenizer.save(tokenizer_path)
+    
+    V = tokenizer.get_vocab_size()
+    
+    # 2. Small Model (For fast CPU training)
+    # N=2 layers, d_model=128, h=4
+    # The current make_model supports: src_vocab, tgt_vocab, N=6, d_model=512, d_ff=2048, h=8, dropout=0.1, layer_norm_mode="pre_ln"
+    
+    model = make_model(V, V, N=2, d_model=128, d_ff=512, h=4)
+    
+    criterion = LabelSmoothing(size=V, padding_idx=tokenizer.pad_token_id, smoothing=0.1)
+    model_opt = NoamOpt(model.src_embed[0].d_model, 1, 400,
+            torch.optim.Adam(model.parameters(), lr=0, betas=(0.9, 0.98), eps=1e-9))
+    
+    # 3. Quick loop
+    from data.loader import TextDataLoader
+    # Train for just 1 epoch on small batch
+    for epoch in range(1):
+        print(f"Epoch {epoch}")
+        model.train()
+        loader = TextDataLoader(src_file, trg_file, tokenizer, batch_size=16, device="cpu")
+        # Run only a few batches just to ensure it saves something non-random
+        run_epoch(loader, model, SimpleLossCompute(model.generator, criterion, model_opt), epoch)
+        
+    torch.save(model.state_dict(), "model_dummy.pt")
+    print("Dummy model saved to model_dummy.pt")
+
 if __name__ == "__main__":
     import sys
     import os
-    if len(sys.argv) > 2 and os.path.exists(sys.argv[1]):
+    if len(sys.argv) > 1 and sys.argv[1] == "dummy":
+        if len(sys.argv) > 3:
+             train_dummy_small(sys.argv[2], sys.argv[3])
+        else:
+             print("Usage: python train.py dummy <src> <trg>")
+    elif len(sys.argv) > 2 and os.path.exists(sys.argv[1]):
         # Usage: python train.py data/train.de data/train.en
         train_real_world(sys.argv[1], sys.argv[2])
     else:
