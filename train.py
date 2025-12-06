@@ -123,7 +123,7 @@ def train_real_world(src_file, trg_file, tokenizer_path="tokenizer.json", vocab_
     model = make_model(V, V, N=6) 
     
     # 3. Optimizer
-    model_opt = NoamOpt(model.src_embed[0].d_model, 1, 400,
+    model_opt = NoamOpt(model.src_embed[0].d_model, 1, 4000,
             torch.optim.Adam(model.parameters(), lr=0, betas=(0.9, 0.98), eps=1e-9))
             
     # 4. Criterion
@@ -143,7 +143,8 @@ def train_real_world(src_file, trg_file, tokenizer_path="tokenizer.json", vocab_
         model.train()
         loader = TextDataLoader(src_file, trg_file, tokenizer, batch_size=32, device=device)
         run_epoch(loader, model, SimpleLossCompute(model.generator, criterion, model_opt), epoch)
-        model.eval()
+        print(f"Saving checkpoint for epoch {epoch}...")    
+        torch.save(model.state_dict(), f"model_epoch_{epoch}.pt")
         # Validation could go here
         
     torch.save(model.state_dict(), "model_real.pt")
