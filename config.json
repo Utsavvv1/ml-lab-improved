@@ -1,0 +1,10 @@
+{
+  "V": 11,
+  "N": 2,
+  "epochs": 10,
+  "batch": 30,
+  "nbatches": 20,
+  "save_path": "models/weights/model_final.pt",
+  "smoothing": 0.0,
+  "log_interval": 50
+}
