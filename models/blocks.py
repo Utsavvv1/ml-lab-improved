@@ -35,8 +35,14 @@ class SublayerConnection(nn.Module):
     def forward(self, x, sublayer):
         "Apply residual connection to any sublayer with the same size."
         if self.mode == "pre_ln":
+            # Pre-LN: Apply normalization BEFORE the sublayer.
+            # This stabilizes training by keeping the residual path clean (x + f(norm(x))).
+            # Used in GPT-2/3 and most modern Transformers.
             return x + self.dropout(sublayer(self.norm(x)))
         elif self.mode == "post_ln":
+            # Post-LN: Apply normalization AFTER the residual connection.
+            # Matches the original "Attention Is All You Need" paper.
+            # x = norm(x + f(x))
             return self.norm(x + self.dropout(sublayer(x)))
 
 def attention(query, key, value, mask=None, dropout=None):

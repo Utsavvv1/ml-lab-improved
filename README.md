@@ -8,21 +8,21 @@ In addition to the standard architecture, this project implements modern optimiz
 
 ### 1\. Baseline Architecture (Implemented)
 
-[cite_start]We have successfully replicated the core components of the original Transformer[cite: 8, 9, 14, 17]:
+We have successfully replicated the core components of the original Transformer:
 
-  * [cite_start]**Multi-Head Attention**: 8 parallel heads with scaled dot-product attention[cite: 17].
-  * [cite_start]**Encoder-Decoder Stack**: Full 6-layer stack with residual connections[cite: 17].
-  * [cite_start]**Positional Encodings**: Standard sinusoidal geometric progression for handling sequence order[cite: 12].
+  * **Multi-Head Attention**: 8 parallel heads with scaled dot-product attention.
+  * **Encoder-Decoder Stack**: Full 6-layer stack with residual connections.
+  * **Positional Encodings**: Standard sinusoidal geometric progression for handling sequence order.
   * **Embeddings**: Shared weights between input/output embeddings and the final linear projection.
-  * [cite_start]**Regularization**: Residual Dropout ($P_{drop}=0.1$) and Label Smoothing ($\epsilon_{ls}=0.1$)[cite: 18].
-  * [cite_start]**Optimizer**: Custom `NoamOpt` scheduler with linear warmup and inverse square root decay[cite: 31].
+  * **Regularization**: Residual Dropout ($P_{drop}=0.1$) and Label Smoothing ($\epsilon_{ls}=0.1$).
+  * **Optimizer**: Custom `NoamOpt` scheduler with linear warmup and inverse square root decay.
 
 ### 2\. Modern Improvements (Implemented)
 
-  * [cite_start]**Pre-Layer Normalization (Pre-LN)**[cite: 32]:
-      * [cite_start]**Problem:** The original Post-LN placement often leads to unstable gradients at initialization[cite: 30, 31].
-      * [cite_start]**Solution:** We moved Layer Normalization to the *input* of the sublayers (inside the residual block)[cite: 32].
-      * [cite_start]**Benefit:** Training is significantly more stable and robust to hyperparameter changes[cite: 36].
+  * **Pre-Layer Normalization (Pre-LN)**:
+      * **Problem:** The original Post-LN placement often leads to unstable gradients at initialization.
+      * **Solution:** We moved Layer Normalization to the *input* of the sublayers (inside the residual block).
+      * **Benefit:** Training is significantly more stable and robust to hyperparameter changes.
       * *Configuration:* Toggled via `layer_norm_mode="pre_ln"` (default) or `post_ln`.
 
 ## 📂 Project Structure
@@ -103,9 +103,9 @@ python inference.py
 
 Based on our [Implementation Progress Report](https://www.google.com/search?q=ml_progress_report.pdf), the following features are planned for the next release:
 
-  * [cite_start]**[Planned] Rotary Positional Embeddings (RoPE)**: Replacing absolute sinusoidal encodings with relative positioning to improve generalization on variable sequence lengths[cite: 39, 42].
-  * [cite_start]**[Planned] GeLU Activation**: Replacing `ReLU` with Gaussian Error Linear Units to avoid the "dying ReLU" problem[cite: 46, 48].
-  * [cite_start]**[Planned] FlashAttention / Linear Attention**: Optimizing the attention mechanism from $O(n^2)$ to $O(n)$ complexity for longer sequence processing[cite: 24, 26].
+  * **[Planned] Rotary Positional Embeddings (RoPE)**: Replacing absolute sinusoidal encodings with relative positioning to improve generalization on variable sequence lengths[cite: 39, 42].
+  * **[Planned] GeLU Activation**: Replacing `ReLU` with Gaussian Error Linear Units to avoid the "dying ReLU" problem[cite: 46, 48].
+  * **[Planned] FlashAttention / Linear Attention**: Optimizing the attention mechanism from $O(n^2)$ to $O(n)$ complexity for longer sequence processing[cite: 24, 26].
 
 ## 📜 License
 
