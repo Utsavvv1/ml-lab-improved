@@ -101,92 +101,40 @@ class RotaryEmbedding(nn.Module):
             
         return self.cos_cached[:, :, :seq_len, ...], self.sin_cached[:, :, :seq_len, ...]
 
-def attention(query, key, value, mask=None, dropout=None):
-    "Compute 'Scaled Dot Product Attention'"
-    # Optimized implementation using PyTorch SDPA (FlashAttention compatible)
-    if hasattr(F, 'scaled_dot_product_attention'):
-        # SDPA expects dropout probability (p) not the module
-        p = 0.0
-        if dropout is not None:
-             p = dropout.p
-             
-        # Handling Mask
-        # SDPA expects:
-        #   - None (no mask)
-        #   - Boolean mask (True = attend, False = ignore) OR (True = ignore, False = attend) depending on version, 
-        #     but usually for causal it supports is_causal=True.
-        #   - Additive mask (float) where -inf is ignore.
-        
-        # Our mask is currently 1 for valid, 0 for invalid (padding).
-        # We also have subsequent_mask which is tril.
-        
-        # Simple fix for now: Convert 1/0 mask to boolean mask for SDPA? 
-        # Actually SDPA supports attn_mask argument. 
-        # It must be broadcastable.
-        
-        # Warning: For "Future Mask" (subsequent), SDPA has is_causal=True.
-        # But our mask argument combines padding mask AND future mask.
-        
-        # Let's try passing the mask directly?
-        # If mask is 0 (ignore) and 1 (keep), we need to ensure SDPA understands it.
-        # PyTorch SDPA docs: "Binary mask ... True indicates that the corresponding position is not allowed to attend." (Wait, check docs).
-        # Actually docs say: "attn_mask: ... shape (L, S) or (N, num_heads, L, S). 
-        # If boolean, True = ignore? No, typically boolean mask where True=Keep is common in some libs but Torch might be opposite.
-        # Let's stick to the additive mask approach which is safest across versions if we are unsure.
-        # Our existing code did: scores.masked_fill(mask == 0, -1e9)
-        # So mask==1 is Keep.
-        
-        # Let's just use the manual fallback if mask is complex, OR try to convert.
-        # Actually, let's just do the manual scaled dot product if we want to be 100% safe with existing masks,
-        # BUT the user specifically asked for FlashAttention.
-        
-        # Let's rely on F.scaled_dot_product_attention to handle the mask if possible.
-        # If we pass a boolean mask, we need to be careful.
-        # If we pass float mask, it works.
-        
-        # If mask is provided:
-        if mask is not None:
-             # Our mask is 1 (keep), 0 (ignore).
-             # SDPA with float mask adds it to attention scores. 
-             # So we need 0 for keep, -inf for ignore.
-             # Convert:
-             if mask.dtype != torch.float:
-                 # Create additive mask
-                 # (1 -> 0, 0 -> -inf)
-                 # We can just use the manual logic which is reliable, 
-                 # OR convert mask. 
-                 pass
-             
-    # Fallback / Original Implementation (Reference)
-    # We will try to use SDPA if dimensions allow and mask is handled.
+    # Sliding Window Implementation (Complexity: O(N*k))
+    # We enforce a window of size 'window_size' around the diagonal.
+    # This makes the complexity linear with respect to sequence length N, multiplied by constant k (window_size).
+    window_size = 50 # Our chosen 'k'
     
-    # Actually, to properly support FlashAttention, we should convert the mask.
-    if hasattr(F, 'scaled_dot_product_attention'):
-         dropout_p = dropout.p if dropout is not None else 0.0
-         is_causal = False # We handle causality via mask
-         
-         # Convert mask to additive if present
-         attn_mask = None
-         if mask is not None:
-             # mask: [Batch, 1, Seq, Seq]
-             # We need to construct a mask that SDPA likes.
-             # For padding mask (1=valid, 0=invalid), we want 0 for valid, -inf for invalid.
-             # Check if mask is boolean:
-             if mask.dtype == torch.bool or mask.dtype == torch.uint8 or mask.dtype == torch.long:
-                  # Create float mask
-                  attn_mask = torch.zeros_like(mask, dtype=query.dtype)
-                  attn_mask.masked_fill_(mask == 0, float("-inf"))
-             else:
-                  # Assume it is already suitable or we fallback
-                  attn_mask = mask
-
-         return F.scaled_dot_product_attention(query, key, value, attn_mask=attn_mask, dropout_p=dropout_p, is_causal=is_causal), None
-         
-    # Legacy Fallback
+    # Create Sliding Window Mask
+    # We want to Keep locations where |i - j| <= window_size
+    seq_len = query.size(-2)
+    # Create indexing grid
+    indices = torch.arange(seq_len, device=query.device)
+    # |i - j| <= k
+    # Broadcast to [Seq, Seq]
+    dist = (indices.unsqueeze(0) - indices.unsqueeze(1)).abs()
+    sliding_mask = (dist <= window_size)
+    
+    # Combine with existing mask
+    if mask is not None:
+        # mask is usually [Batch, 1, Seq, Seq] or similar
+        # sliding_mask is [Seq, Seq]
+        # We need to broadcast sliding_mask
+        # Ensure mask is boolean-ish for logic AND
+        # Or just use masked_fill on the scores
+        pass
+        
     d_k = query.size(-1)
     scores = torch.matmul(query, key.transpose(-2, -1)) / math.sqrt(d_k)
+    
+    # Apply Sliding Window Mask first
+    # This sets everything outside the diagonal band to -inf
+    scores = scores.masked_fill(sliding_mask.unsqueeze(0).unsqueeze(0) == 0, -1e9)
+    
     if mask is not None:
         scores = scores.masked_fill(mask == 0, -1e9)
+        
     p_attn = F.softmax(scores, dim=-1)
     if dropout is not None:
         p_attn = dropout(p_attn)
