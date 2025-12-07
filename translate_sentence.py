@@ -6,6 +6,13 @@ from utils.tokenizer import BPETokenizer
 from inference import beam_search
 
 def load_translator(model_path="model_real.pt", tokenizer_path="tokenizer.json"):
+    """
+    Loads the necessary components for translation.
+    
+    Returns:
+        model: The trained PyTorch model (in eval mode).
+        tokenizer: The BPE tokenizer.
+    """
     # 1. Load Tokenizer
     tokenizer = BPETokenizer()
     if not os.path.exists(tokenizer_path):
@@ -22,7 +29,7 @@ def load_translator(model_path="model_real.pt", tokenizer_path="tokenizer.json")
         model.load_state_dict(torch.load(model_path, map_location=torch.device('cpu')))
     except:
         try:
-             # Try Dummy Model (N=2)
+             # Try Dummy Model (N=2) - Fallback for small tests
              print("N=6 failed, trying N=2...")
              model = make_model(V, V, N=2, d_model=128, d_ff=512, h=4)
              model.load_state_dict(torch.load(model_path, map_location=torch.device('cpu')))
@@ -34,9 +41,12 @@ def load_translator(model_path="model_real.pt", tokenizer_path="tokenizer.json")
     return model, tokenizer
 
 def translate(sentence, model, tokenizer):
+    """
+    Translates a single sentence string using the model.
+    """
     device = "cpu" # Inference on CPU is fine for single sentences
     
-    # Encode
+    # Encode user input to token IDs
     ids = tokenizer.encode(sentence)
     src = torch.LongTensor([ids]).to(device)
     src_mask = torch.ones(1, 1, len(ids)).to(device)
@@ -47,7 +57,7 @@ def translate(sentence, model, tokenizer):
     # We will try a smaller max_len for testing.
     out_seq = beam_search(model, src, src_mask, max_len=30, start_symbol=tokenizer.sos_token_id, beam_size=3)
     
-    # Convert text
+    # Convert token IDs back to text
     out_ids = out_seq.flatten().tolist()
     return tokenizer.decode(out_ids)
 

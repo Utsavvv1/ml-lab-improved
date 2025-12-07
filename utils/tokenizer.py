@@ -4,13 +4,23 @@ from tokenizers.trainers import BpeTrainer
 from tokenizers.pre_tokenizers import Whitespace
 
 class BPETokenizer:
+    """
+    Wrapper around Hugging Face's `tokenizers` library.
+    Implements Byte-Pair Encoding (BPE) for subword tokenization.
+    """
     def __init__(self, vocab_size=5000):
-        # Initialize BPE model
+        # Initialize BPE model with [UNK] token for unknown words
         self.tokenizer = Tokenizer(BPE(unk_token="[UNK]"))
         self.tokenizer.pre_tokenizer = Whitespace()
         
-        # PAD=0, SOS=1, EOS=2, UNK=3 based on order
+        # Define special tokens:
+        # [PAD]: Padding for batching
+        # [SOS]: Start of Sentence
+        # [EOS]: End of Sentence
+        # [UNK]: Unknown token
         self.special_tokens = ["[PAD]", "[SOS]", "[EOS]", "[UNK]"]
+        
+        # Trainer will learn the vocabulary from the data
         self.trainer = BpeTrainer(vocab_size=vocab_size, special_tokens=self.special_tokens)
         
     def train(self, files):

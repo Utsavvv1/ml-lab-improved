@@ -3,6 +3,10 @@ from models import make_model
 from data import subsequent_mask
 
 def greedy_decode(model, src, src_mask, max_len, start_symbol):
+    """
+    Standard greedy decoding. 
+    Same as in train.py, included here for standalone inference usage.
+    """
     memory = model.encode(src, src_mask)
     ys = torch.ones(1, 1).fill_(start_symbol).type_as(src.data)
     for i in range(max_len-1):
@@ -17,12 +21,28 @@ def greedy_decode(model, src, src_mask, max_len, start_symbol):
     return ys
 
 def beam_search(model, src, src_mask, max_len, start_symbol, beam_size=5):
+    """
+    Beam Search decoding.
+    Maintains 'beam_size' most likely sequences at each step.
+    
+    Args:
+        model: Transformer model.
+        src: Source tensor.
+        src_mask: Source mask.
+        max_len: Max generation length.
+        start_symbol: SOS token ID.
+        beam_size: Number of branches to keep.
+        
+    Returns:
+        The best sequence found (tensor).
+    """
     memory = model.encode(src, src_mask)
     start_seq = torch.ones(1, 1).fill_(start_symbol).type_as(src.data)
     # beam = [(sequence, log_prob_sum)]
     beam = [(start_seq, 0.0)]
     
     # Paper uses alpha = 0.6 for length penalty
+    # Length penalty ensures longer sentences aren't unfairly penalized by summing more negative log probs
     alpha = 0.6
 
     for i in range(max_len-1):
@@ -32,13 +52,13 @@ def beam_search(model, src, src_mask, max_len, start_symbol, beam_size=5):
                  candidates.append((seq, log_prob_sum))
                  continue
                  
-            # Expand
+            # Expand current sequence
             out = model.decode(memory, src_mask, 
                                seq, 
                                subsequent_mask(seq.size(1)).type_as(src.data))
             prob = model.generator(out[:, -1])
             
-            # Get top k for this beam
+            # Get top k probable next words for this branch
             topk_probs, topk_indices = torch.topk(prob, beam_size, dim=1)
             
             for k in range(beam_size):
@@ -56,13 +76,16 @@ def beam_search(model, src, src_mask, max_len, start_symbol, beam_size=5):
             penalty = ((5 + length) / 6) ** alpha
             return lp_sum / penalty
 
+        # Keep top 'beam_size' candidates across all expansions
         candidates.sort(key=get_score, reverse=True)
         beam = candidates[:beam_size]
         
         # Break if all beams ended (optional optimization)
+        # Assuming 2 is EOS token
         if all(c[0][0, -1] == 2 for c in beam):
             break
             
+    # Return the single best sequence
     return beam[0][0]
 
 def load_model(path="model_final.pt", V=11):

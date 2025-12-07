@@ -9,36 +9,81 @@ from utils import SimpleLossCompute, LabelSmoothing, NoamOpt
 
 
 def run_epoch(data_iter, model, loss_compute, epoch_num, log_interval=50):
-    "Standard Training and Logging Function"
+    """
+    Standard Training and Logging Function.
+    
+    Args:
+        data_iter: Iterator returning batches of data.
+        model: The Transformer model to train or evaluate.
+        loss_compute: Function to calculate loss and handle backpropagation.
+        epoch_num: Current epoch number (for display).
+        log_interval: How often to print training stats (batches).
+        
+    Returns:
+        Average loss across the epoch.
+    """
     start = time.time()
     total_tokens = 0
     total_loss = 0
     tokens = 0
+    
+    # Iterate over all batches in the dataset
     for i, batch in enumerate(data_iter):
+        # Forward pass: compute the model output given source and target
         out = model.forward(batch.src, batch.trg,
                             batch.src_mask, batch.trg_mask)
+                            
+        # Compute loss: compare output with actual target (trg_y)
+        # This function also handles the backward pass and optimizer step if training
         loss = loss_compute(out, batch.trg_y, batch.ntokens)
+        
         total_loss += loss
         total_tokens += batch.ntokens
         tokens += batch.ntokens
+        
+        # Logging
         if i % log_interval == 1:
             elapsed = time.time() - start
             print(f"Epoch Step: {i} Loss: {loss / batch.ntokens:.6f} Tokens/sec: {tokens / elapsed:.2f}")
             start = time.time()
             tokens = 0
+            
     return total_loss / total_tokens
 
 
 def greedy_decode(model, src, src_mask, max_len, start_symbol):
+    """
+    Greedy decoding for inference. 
+    Selects the word with highest probability at each step.
+    
+    Args:
+        model: Trained Transformer model.
+        src: Source sequence tensor.
+        src_mask: Mask for source sequence.
+        max_len: Maximum length of generated sequence.
+        start_symbol: ID of the [SOS] token to start generation.
+    """
+    # 1. Encode the source sequence once
     memory = model.encode(src, src_mask)
+    
+    # 2. Initialize target sequence with start symbol
     ys = torch.ones(1, 1).fill_(start_symbol).type_as(src.data)
+    
+    # 3. Autoregressive decoding loop
     for i in range(max_len - 1):
+        # Decode the current sequence using the encoded memory
         out = model.decode(memory, src_mask,
                            ys,
                            subsequent_mask(ys.size(1)).type_as(src.data))
+                           
+        # Get probabilities for the last token
         prob = model.generator(out[:, -1])
+        
+        # Pick the single most likely next token (Greedy)
         _, next_word = torch.max(prob, dim=1)
         next_word = next_word.data[0]
+        
+        # Append next word to the sequence
         ys = torch.cat([ys,
                         torch.ones(1, 1).type_as(src.data).fill_(next_word)], dim=1)
     return ys
@@ -101,6 +146,15 @@ def train_copy_task(config=None):
     print("Predicted:", pred)
 
 def train_real_world(src_file, trg_file, tokenizer_path="tokenizer.json", vocab_size=5000, epoch_count=10):
+    """
+    Train on real-world text files.
+    
+    Steps:
+    1. Train/Load a BPE tokenizer on the data.
+    2. Initialize the Transformer model.
+    3. Run the training loop for specified epochs.
+    4. Save checkpoints and final model.
+    """
     print(f"Starting Real World Training with {src_file} -> {trg_file}")
     
     # 1. Train or Load Tokenizer
@@ -118,15 +172,18 @@ def train_real_world(src_file, trg_file, tokenizer_path="tokenizer.json", vocab_
     V = tokenizer.get_vocab_size()
     print(f"Vocabulary Size: {V}")
     
-    # 2. Model
+    # 2. Model Initialization
+    # N=6 is standard for "Attention is All You Need", but heavy for CPUs.
     # Note: You might want to tune d_model etc for real tasks
     model = make_model(V, V, N=6) 
     
     # 3. Optimizer
+    # NoamOpt implements the warm-up and decay schedule from the paper.
     model_opt = NoamOpt(model.src_embed[0].d_model, 1, 4000,
             torch.optim.Adam(model.parameters(), lr=0, betas=(0.9, 0.98), eps=1e-9))
             
-    # 4. Criterion
+    # 4. Criterion (Loss Function)
+    # LabelSmoothing helps prevent the model from becoming too confident.
     pad_idx = tokenizer.pad_token_id
     criterion = LabelSmoothing(size=V, padding_idx=pad_idx, smoothing=0.1)
     
@@ -136,13 +193,17 @@ def train_real_world(src_file, trg_file, tokenizer_path="tokenizer.json", vocab_
     else:
         device = "cpu"
     
-    # 5. Loop
+    # 5. Training Loop
     from data.loader import TextDataLoader
     for epoch in range(epoch_count):
         print(f"Epoch {epoch}")
-        model.train()
+        model.train() # Set model to training mode (enables dropout)
+        
+        # Loader handles reading files, tokenizing, and creating batches
         loader = TextDataLoader(src_file, trg_file, tokenizer, batch_size=32, device=device)
+        
         run_epoch(loader, model, SimpleLossCompute(model.generator, criterion, model_opt), epoch)
+        
         print(f"Saving checkpoint for epoch {epoch}...")    
         torch.save(model.state_dict(), f"model_epoch_{epoch}.pt")
         # Validation could go here

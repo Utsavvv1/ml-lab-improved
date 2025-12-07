@@ -3,6 +3,10 @@ import subprocess
 import sys
 
 def run_command(command):
+    """
+    Executes a shell command and checks for errors.
+    STDOUT is printed to console.
+    """
     print(f"--> Running: {command}")
     try:
         subprocess.check_call(command, shell=True)
@@ -11,6 +15,10 @@ def run_command(command):
         sys.exit(1)
 
 def main():
+    """
+    Main orchestration script for Google Colab or new environments.
+    Sequentially runs installation, data download, training, and evaluation.
+    """
     print("=======================================")
     print("   ML Lab Transformer - Colab Runner   ")
     print("=======================================")

@@ -9,6 +9,12 @@ from inference import beam_search
 from data import subsequent_mask
 
 def load_model(path, V):
+    """
+    Load a trained model from disk.
+    
+    Since we might have models with different configurations (N=6 for real, N=2 for copy task),
+    this function tries to infer the correct configuration by attempting to load the state dict.
+    """
     print(f"Loading model from {path}...")
     
     # Try default N=6 (Real World)
@@ -17,25 +23,35 @@ def load_model(path, V):
         model.load_state_dict(torch.load(path))
         print("Loaded model with N=6 (Real World default).")
     except Exception:
-        # Try N=2 (Copy Task default)
+        # If N=6 fails (likely due to shape mismatch), try N=2 (Copy Task default)
         try:
              print("Loading failed. Trying N=2 (Copy Task default)...")
              model = make_model(V, V, N=2)
              model.load_state_dict(torch.load(path))
              print("Loaded model with N=2.")
         except Exception:
-             # Try Dummy Model Config (N=2, d_model=128, etc)
+             # Try Dummy Model Config (N=2, d_model=128, etc) as a fallback
              print("Loading failed. Trying Dummy Model Config (N=2, d_model=128)...")
              model = make_model(V, V, N=2, d_model=128, d_ff=512, h=4)
              model.load_state_dict(torch.load(path))
              print("Loaded Dummy Model.")
         
-    model.eval()
+    model.eval() # Set to evaluation mode (disable dropout)
     if torch.cuda.is_available():
         model.cuda()
     return model
 
 def evaluate(model_path, src_file, ref_file, tokenizer_path="tokenizer.json", beam_size=5, max_len=100):
+    """
+    Calculate BLEU score for a trained model.
+    
+    Pipeline:
+    1. Load Tokenizer.
+    2. Load Model.
+    3. Read Source and Reference files.
+    4. Generate Hypotheses (Translation) for each source sentence.
+    5. Compare Hypotheses with Reference using BLEU.
+    """
     # 1. Load Tokenizer
     tokenizer = BPETokenizer()
     if not os.path.exists(tokenizer_path):
