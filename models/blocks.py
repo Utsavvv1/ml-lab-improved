@@ -101,36 +101,32 @@ class RotaryEmbedding(nn.Module):
             
         return self.cos_cached[:, :, :seq_len, ...], self.sin_cached[:, :, :seq_len, ...]
 
-    # Sliding Window Implementation (Complexity: O(N*k))
-    # We enforce a window of size 'window_size' around the diagonal.
-    # This makes the complexity linear with respect to sequence length N, multiplied by constant k (window_size).
-    window_size = 50 # Our chosen 'k'
-    
-    # Create Sliding Window Mask
-    # We want to Keep locations where |i - j| <= window_size
+
+def attention(query, key, value, mask=None, dropout=None):
+    "Compute 'Scaled Dot Product Attention' with Sliding Window."
+
     seq_len = query.size(-2)
-    # Create indexing grid
-    indices = torch.arange(seq_len, device=query.device)
-    # |i - j| <= k
-    # Broadcast to [Seq, Seq]
-    dist = (indices.unsqueeze(0) - indices.unsqueeze(1)).abs()
-    sliding_mask = (dist <= window_size)
-    
-    # Combine with existing mask
-    if mask is not None:
-        # mask is usually [Batch, 1, Seq, Seq] or similar
-        # sliding_mask is [Seq, Seq]
-        # We need to broadcast sliding_mask
-        # Ensure mask is boolean-ish for logic AND
-        # Or just use masked_fill on the scores
-        pass
-        
     d_k = query.size(-1)
-    scores = torch.matmul(query, key.transpose(-2, -1)) / math.sqrt(d_k)
     
-    # Apply Sliding Window Mask first
-    # This sets everything outside the diagonal band to -inf
-    scores = scores.masked_fill(sliding_mask.unsqueeze(0).unsqueeze(0) == 0, -1e9)
+    scores = torch.matmul(query, key.transpose(-2, -1)) / math.sqrt(d_k)
+
+    # Sliding Window Logic
+    # NOTE: We only apply this for Self-Attention (same sequence length).
+    # For Cross-Attention (Query len != Key len), position alignment is ambiguous 
+    # without absolute positions, so we skip the detailed windowing.
+    if query.size(-2) == key.size(-2):
+        window_size = 50 # Our chosen 'k'
+
+        # Create indexing grid
+        indices = torch.arange(seq_len, device=query.device)
+        # |i - j| <= k
+        # Broadcast to [Seq, Seq]
+        dist = (indices.unsqueeze(0) - indices.unsqueeze(1)).abs()
+        sliding_mask = (dist <= window_size)
+        
+        # Apply Sliding Window Mask
+        # This sets everything outside the diagonal band to -inf
+        scores = scores.masked_fill(sliding_mask.unsqueeze(0).unsqueeze(0) == 0, -1e9)
     
     if mask is not None:
         scores = scores.masked_fill(mask == 0, -1e9)
@@ -139,6 +135,7 @@ class RotaryEmbedding(nn.Module):
     if dropout is not None:
         p_attn = dropout(p_attn)
     return torch.matmul(p_attn, value), p_attn
+
 
 class MultiHeadedAttention(nn.Module):
     def __init__(self, h, d_model, dropout=0.1):
